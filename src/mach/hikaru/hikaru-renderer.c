@@ -105,7 +105,8 @@ get_uniform_loc (GLuint prog, const char *id)
 
 	loc = glGetUniformLocation (prog, id);
 	VK_ASSERT_NO_GL_ERROR ();
-	VK_ASSERT (loc != (GLuint) -1);
+	if (loc == (GLuint) -1)
+		VK_ABORT ("uniform '%s' has no location!", id);
 
 	return loc;
 }
@@ -1590,45 +1591,63 @@ static const struct {
 };
 
 static const char *fb_vs_source =
-"#version 140\n"
-"\n"
-"#extension GL_ARB_explicit_attrib_location : require\n"
-"\n"
-"uniform mat4 u_projection =\n"
-"	mat4 (vec4 ( 2.0,  0.0,  0.0,  0.0),\n"
-"	      vec4 ( 0.0, -2.0,  0.0,  0.0),\n"
-"	      vec4 ( 0.0,  0.0, -1.0,  0.0),\n"
-"	      vec4 (-1.0,  1.0,  0.0,  1.0));\n"
-"\n"
-"layout(location = 0) in vec3 i_position;\n"
-"layout(location = 1) in vec2 i_texcoords;\n"
-"\n"
-"out vec2 p_texcoords;\n"
-"\n"
-"void main (void) {\n"
-"	gl_Position = u_projection * vec4 (i_position, 1.0);\n"
-"	p_texcoords = i_texcoords;\n"
-"}\n";
+"#version 140									\n"
+"										\n"
+"#extension GL_ARB_explicit_attrib_location : require				\n"
+"										\n"
+"uniform mat4 u_projection =							\n"
+"	mat4 (vec4 ( 2.0,  0.0,  0.0,  0.0),					\n"
+"	      vec4 ( 0.0, -2.0,  0.0,  0.0),					\n"
+"	      vec4 ( 0.0,  0.0, -1.0,  0.0),					\n"
+"	      vec4 (-1.0,  1.0,  0.0,  1.0));					\n"
+"										\n"
+"layout(location = 0) in vec3 i_position;					\n"
+"layout(location = 1) in vec2 i_texcoords;					\n"
+"										\n"
+"out vec2 p_texcoords;								\n"
+"										\n"
+"void main (void) {								\n"
+"	gl_Position = u_projection * vec4 (i_position, 1.0);			\n"
+"	p_texcoords = i_texcoords;						\n"
+"}										\n";
 
 static const char *fb_fs_source =
-"#version 140\n"
-"\n"
-"uniform sampler2D u_front;\n"
-"uniform sampler2D u_back;\n"
-"uniform sampler2D u_layer1;\n"
-"uniform sampler2D u_layer2;\n"
-"uniform float u_factor;\n"
-"uniform float u_mult1;\n"
-"uniform float u_mult2;\n"
-"\n"
-"in vec2 p_texcoords;\n"
-"\n"
-"void main (void) {\n"
-"	vec4 texel_f = texture (u_front, p_texcoords);\n"
-"	vec4 texel_b = texture (u_back,  p_texcoords);\n"
-"	vec4 texel_1 = texture (u_layer1, vec2 (p_texcoords.s, 1 - p_texcoords.t));\n"
-"	vec4 texel_2 = texture (u_layer2, vec2 (p_texcoords.s, 1 - p_texcoords.t));\n"
-"	gl_FragColor = mix (texel_b, texel_f, u_factor) + texel_1 * u_mult1 + texel_2 * u_mult2;\n"
+"#version 140									\n"
+"										\n"
+"uniform sampler2D u_front;							\n"
+"uniform sampler2D u_back;							\n"
+"uniform sampler2D u_layer1;							\n"
+"uniform sampler2D u_layer2;							\n"
+"uniform float u_factor = 0.0;							\n"
+"uniform float u_mult_f = 1.0;							\n"
+"uniform float u_mult_b = 1.0;							\n"
+"uniform float u_mult_1 = 1.0;							\n"
+"uniform float u_mult_2 = 1.0;							\n"
+"uniform int u_invert_f = 0;							\n"
+"uniform int u_invert_b = 0;							\n"
+"										\n"
+"in vec2 p_texcoords;								\n"
+"										\n"
+"void main (void) {								\n"
+"	vec2 p_texcoords_inv = vec2 (p_texcoords.s, 1 - p_texcoords.t);		\n"
+"	vec4 texel_f, texel_b;							\n"
+"										\n"
+"	if (u_invert_f == 0)							\n"
+"		texel_f = texture (u_front, p_texcoords);			\n"
+"	else									\n"
+"		texel_f = texture (u_front, p_texcoords_inv);			\n"
+"	texel_f = texel_f * u_mult_f;						\n"
+"										\n"
+"	if (u_invert_b == 0)							\n"
+"		texel_b = texture (u_back,  p_texcoords);			\n"
+"	else									\n"
+"		texel_b = texture (u_back,  p_texcoords_inv);			\n"
+"	texel_b = texel_b * u_mult_b;						\n"
+"										\n"
+"	vec4 texel_1 = texture (u_layer1, p_texcoords_inv) * u_mult_1;		\n"
+"	vec4 texel_2 = texture (u_layer2, p_texcoords_inv) * u_mult_2;		\n"
+"										\n"
+"	gl_FragColor = mix (texel_f, texel_b, u_factor) + texel_1 + texel_2;	\n"
 "}\n";
 
 #define NUM_FRAMEBUFFERS 2
@@ -1642,6 +1661,7 @@ build_fb_state (hikaru_renderer_t *hr)
 	static const GLenum targets[1] = { GL_COLOR_ATTACHMENT0 };
 	unsigned i;
 
+	/* Compile the framebuffer GLSL program and retrieve the uniforms. */
 	hr->framebuffer.program =
 		vk_renderer_compile_program (fb_vs_source, fb_fs_source);
 	VK_ASSERT_NO_GL_ERROR ();
@@ -1656,10 +1676,18 @@ build_fb_state (hikaru_renderer_t *hr)
 		get_uniform_loc (hr->framebuffer.program, "u_layer2");
 	hr->framebuffer.locs.u_factor =
 		get_uniform_loc (hr->framebuffer.program, "u_factor");
-	hr->framebuffer.locs.u_mult1 =
-		get_uniform_loc (hr->framebuffer.program, "u_mult1");
-	hr->framebuffer.locs.u_mult2 =
-		get_uniform_loc (hr->framebuffer.program, "u_mult2");
+	hr->framebuffer.locs.u_mult_f =
+		get_uniform_loc (hr->framebuffer.program, "u_mult_f");
+	hr->framebuffer.locs.u_mult_b =
+		get_uniform_loc (hr->framebuffer.program, "u_mult_b");
+	hr->framebuffer.locs.u_mult_1 =
+		get_uniform_loc (hr->framebuffer.program, "u_mult_1");
+	hr->framebuffer.locs.u_mult_2 =
+		get_uniform_loc (hr->framebuffer.program, "u_mult_2");
+	hr->framebuffer.locs.u_invert_f =
+		get_uniform_loc (hr->framebuffer.program, "u_invert_f");
+	hr->framebuffer.locs.u_invert_b =
+		get_uniform_loc (hr->framebuffer.program, "u_invert_b");
 
 	/* Generate two framebuffers (the front and the back buffers), each
 	 * associated with a colorbuffer (texture) and a depth buffer
@@ -1844,7 +1872,7 @@ draw (hikaru_renderer_t *hr)
 		upload_layer (hr, &LAYERS.layer[0][1], &layer2, &mult2);
 
 
-	/* Draw the 3D scene on the front buffer. */
+	/* Draw the 3D scene to the front buffer. */
 	glBindFramebuffer (GL_FRAMEBUFFER, f);
 	VK_ASSERT_NO_GL_ERROR ();
 
@@ -1857,12 +1885,9 @@ draw (hikaru_renderer_t *hr)
 
 	/* Setup the GL state for 2D drawing. */
 	glDisable (GL_DEPTH_TEST);
-	VK_ASSERT_NO_GL_ERROR ();
-
 	glDisable (GL_BLEND);
-	VK_ASSERT_NO_GL_ERROR ();
-
 	glDisable (GL_POLYGON_OFFSET_FILL);
+	VK_ASSERT_NO_GL_ERROR ();
 
 
 	/* Composite all the buffers (front, back, layers). */
@@ -1879,20 +1904,34 @@ draw (hikaru_renderer_t *hr)
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glActiveTexture (GL_TEXTURE0 + 2);
-	glBindTexture (GL_TEXTURE_2D, (b != layer1) ? layer1 : 0);
+	glBindTexture (GL_TEXTURE_2D, (f != layer1 && b != layer1) ? layer1 : 0);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glActiveTexture (GL_TEXTURE0 + 3);
-	glBindTexture (GL_TEXTURE_2D, (b != layer2) ? layer2 : 0);
+	glBindTexture (GL_TEXTURE_2D, (f != layer2 && b != layer2) ? layer2 : 0);
 	VK_ASSERT_NO_GL_ERROR ();
 
-	glUniform1i (hr->framebuffer.locs.u_front, 0);
-	glUniform1i (hr->framebuffer.locs.u_back, 1);
+	glUniform1i (hr->framebuffer.locs.u_front,  0);
+	glUniform1i (hr->framebuffer.locs.u_back,   1);
 	glUniform1i (hr->framebuffer.locs.u_layer1, 2);
 	glUniform1i (hr->framebuffer.locs.u_layer2, 3);
 	glUniform1f (hr->framebuffer.locs.u_factor, factor);
-	glUniform1f (hr->framebuffer.locs.u_mult1, mult1);
-	glUniform1f (hr->framebuffer.locs.u_mult2, mult2);
+	if (f == layer1 && mult1 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_f, mult1);
+	else if (f == layer2 && mult2 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_f, mult2);
+	if (b == layer1 && mult1 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_b, mult1);
+	else if (b == layer2 && mult2 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_b, mult2);
+	if (mult1 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_1, mult1);
+	if (mult2 != 1.0)
+		glUniform1f (hr->framebuffer.locs.u_mult_2, mult2);
+	if (n1 >= 2)
+		glUniform1i (hr->framebuffer.locs.u_invert_f, 1);
+	if (n2 >= 2)
+		glUniform1i (hr->framebuffer.locs.u_invert_b, 1);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glBindVertexArray (hr->framebuffer.vao);

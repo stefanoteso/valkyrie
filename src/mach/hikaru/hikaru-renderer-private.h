@@ -163,8 +163,12 @@ typedef struct {
 			GLuint u_layer1;
 			GLuint u_layer2;
 			GLuint u_factor;
-			GLuint u_mult1;
-			GLuint u_mult2;
+			GLuint u_mult_f;
+			GLuint u_mult_b;
+			GLuint u_mult_1;
+			GLuint u_mult_2;
+			GLuint u_invert_f;
+			GLuint u_invert_b;
 		} locs;
 	} framebuffer;
 
