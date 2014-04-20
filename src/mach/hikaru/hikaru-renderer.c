@@ -95,6 +95,22 @@ update_debug_flags (hikaru_renderer_t *hr)
 }
 
 /****************************************************************************
+ Utils
+****************************************************************************/
+
+static GLuint
+get_uniform_loc (GLuint prog, const char *id)
+{
+	GLuint loc;
+
+	loc = glGetUniformLocation (prog, id);
+	VK_ASSERT_NO_GL_ERROR ();
+	VK_ASSERT (loc != (GLuint) -1);
+
+	return loc;
+}
+
+/****************************************************************************
  Textures
 ****************************************************************************/
 
