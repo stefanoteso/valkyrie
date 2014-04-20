@@ -1576,17 +1576,29 @@ build_3d_state (hikaru_renderer_t *hr)
 }
 
 /****************************************************************************
- 2D
+ Framebuffers
 ****************************************************************************/
 
-/* TODO implement dirty rectangles. */
+static const struct {
+       vec3f_t position;
+       vec2f_t texcoords;
+} fb_vbo_data[] = {
+       { { 1.0f, 0.0f, 0.0f }, { 1.0f, 1.0f } },
+       { { 0.0f, 0.0f, 0.0f }, { 0.0f, 1.0f } },
+       { { 1.0f, 1.0f, 0.0f }, { 1.0f, 0.0f } },
+       { { 0.0f, 1.0f, 0.0f }, { 0.0f, 0.0f } },
+};
 
-static const char *layer_vs_source =
+static const char *fb_vs_source =
 "#version 140\n"
 "\n"
 "#extension GL_ARB_explicit_attrib_location : require\n"
 "\n"
-"uniform mat4 u_projection;\n"
+"uniform mat4 u_projection =\n"
+"	mat4 (vec4 ( 2.0,  0.0,  0.0,  0.0),\n"
+"	      vec4 ( 0.0, -2.0,  0.0,  0.0),\n"
+"	      vec4 ( 0.0,  0.0, -1.0,  0.0),\n"
+"	      vec4 (-1.0,  1.0,  0.0,  1.0));\n"
 "\n"
 "layout(location = 0) in vec3 i_position;\n"
 "layout(location = 1) in vec2 i_texcoords;\n"
@@ -1598,67 +1610,123 @@ static const char *layer_vs_source =
 "	p_texcoords = i_texcoords;\n"
 "}\n";
 
-static const char *layer_fs_source =
+static const char *fb_fs_source =
 "#version 140\n"
 "\n"
-"uniform sampler2D u_texture;\n"
-"uniform float u_texture_multiplier;\n"
+"uniform sampler2D u_front;\n"
+"uniform sampler2D u_back;\n"
+"uniform sampler2D u_layer1;\n"
+"uniform sampler2D u_layer2;\n"
+"uniform float u_factor;\n"
+"uniform float u_mult1;\n"
+"uniform float u_mult2;\n"
 "\n"
 "in vec2 p_texcoords;\n"
 "\n"
 "void main (void) {\n"
-"	vec4 texel = texture (u_texture, p_texcoords);\n"
-"	gl_FragColor = u_texture_multiplier * texel;\n"
+"	vec4 texel_f = texture (u_front, p_texcoords);\n"
+"	vec4 texel_b = texture (u_back,  p_texcoords);\n"
+"	vec4 texel_1 = texture (u_layer1, vec2 (p_texcoords.s, 1 - p_texcoords.t));\n"
+"	vec4 texel_2 = texture (u_layer2, vec2 (p_texcoords.s, 1 - p_texcoords.t));\n"
+"	gl_FragColor = mix (texel_b, texel_f, u_factor) + texel_1 * u_mult1 + texel_2 * u_mult2;\n"
 "}\n";
 
-static const struct {
-	vec3f_t position;
-	vec2f_t texcoords;
-} layer_vbo_data[] = {
-	{ { 1.0f, 0.0f, 0.0f }, { 1.0f, 0.0f } },
-	{ { 0.0f, 0.0f, 0.0f }, { 0.0f, 0.0f } },
-	{ { 1.0f, 1.0f, 0.0f }, { 1.0f, 1.0f } },
-	{ { 0.0f, 1.0f, 0.0f }, { 0.0f, 1.0f } },
-};
+#define NUM_FRAMEBUFFERS 2
 
 #define OFFSET(member_) \
-	((const GLvoid *) offsetof (typeof (layer_vbo_data[0]), member_))
+	((const GLvoid *) offsetof (typeof (fb_vbo_data[0]), member_))
 
 static int
-build_2d_state (hikaru_renderer_t *hr)
+build_fb_state (hikaru_renderer_t *hr)
 {
-	/* Create the GLSL program. */
-	hr->layers.program =
-		vk_renderer_compile_program (layer_vs_source, layer_fs_source);
+	static const GLenum targets[1] = { GL_COLOR_ATTACHMENT0 };
+	unsigned i;
 
-	hr->layers.locs.u_projection =
-		glGetUniformLocation (hr->layers.program, "u_projection");
-	VK_ASSERT (hr->layers.locs.u_projection != (GLuint) -1);
-
-	hr->layers.locs.u_texture =
-		glGetUniformLocation (hr->layers.program, "u_texture");
-	VK_ASSERT (hr->layers.locs.u_texture != (GLuint) -1);
-
-	hr->layers.locs.u_texture_multiplier =
-		glGetUniformLocation (hr->layers.program, "u_texture_multiplier");
-	VK_ASSERT (hr->layers.locs.u_texture_multiplier != (GLuint) -1);
-
-	/* Create the VAO/VBO. */
-	glGenVertexArrays (1, &hr->layers.vao);
-	glBindVertexArray (hr->layers.vao);
+	hr->framebuffer.program =
+		vk_renderer_compile_program (fb_vs_source, fb_fs_source);
 	VK_ASSERT_NO_GL_ERROR ();
 
-	glGenBuffers (1, &hr->layers.vbo);
-	glBindBuffer (GL_ARRAY_BUFFER, hr->layers.vbo);
+	hr->framebuffer.locs.u_front =
+		get_uniform_loc (hr->framebuffer.program, "u_front");
+	hr->framebuffer.locs.u_back =
+		get_uniform_loc (hr->framebuffer.program, "u_back");
+	hr->framebuffer.locs.u_layer1 =
+		get_uniform_loc (hr->framebuffer.program, "u_layer1");
+	hr->framebuffer.locs.u_layer2 =
+		get_uniform_loc (hr->framebuffer.program, "u_layer2");
+	hr->framebuffer.locs.u_factor =
+		get_uniform_loc (hr->framebuffer.program, "u_factor");
+	hr->framebuffer.locs.u_mult1 =
+		get_uniform_loc (hr->framebuffer.program, "u_mult1");
+	hr->framebuffer.locs.u_mult2 =
+		get_uniform_loc (hr->framebuffer.program, "u_mult2");
+
+	/* Generate two framebuffers (the front and the back buffers), each
+	 * associated with a colorbuffer (texture) and a depth buffer
+	 * (renderbuffer). */
+	glGenFramebuffers (NUM_FRAMEBUFFERS, hr->framebuffer.fb);
+	glGenTextures (NUM_FRAMEBUFFERS, hr->framebuffer.cb);
+	glGenRenderbuffers (NUM_FRAMEBUFFERS, hr->framebuffer.db);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	for (i = 0; i < NUM_FRAMEBUFFERS; i++) {
+
+		/* Bind the i'th framebuffer */
+		glBindFramebuffer (GL_FRAMEBUFFER, hr->framebuffer.fb[i]);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		/* Create and attach a texture as color buffer. */
+		glBindTexture (GL_TEXTURE_2D, hr->framebuffer.cb[i]);
+		VK_ASSERT_NO_GL_ERROR ();
+		glTexStorage2D (GL_TEXTURE_2D, 1, GL_RGBA8, 640, 480);
+		VK_ASSERT_NO_GL_ERROR ();
+		glTexSubImage2D (GL_TEXTURE_2D, 0, 0, 0, 640, 480,
+		                 GL_RGBA, GL_UNSIGNED_BYTE, NULL);
+		VK_ASSERT_NO_GL_ERROR ();
+		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+		VK_ASSERT_NO_GL_ERROR ();
+		glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		glFramebufferTexture2D (GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0,
+		                        GL_TEXTURE_2D, hr->framebuffer.cb[i], 0);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		glDrawBuffers (1, targets);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		/* Create and attach a renderbuffer as depth buffer. */
+		glBindRenderbuffer (GL_RENDERBUFFER, hr->framebuffer.db[i]);
+		glRenderbufferStorage (GL_RENDERBUFFER, GL_DEPTH_COMPONENT, 640, 480);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		glFramebufferRenderbuffer (GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT,
+		                           GL_RENDERBUFFER, hr->framebuffer.db[i]);
+		VK_ASSERT_NO_GL_ERROR ();
+
+		if (glCheckFramebufferStatus (GL_FRAMEBUFFER) != GL_FRAMEBUFFER_COMPLETE)
+			return -1;
+	}
+
+	glBindFramebuffer (GL_FRAMEBUFFER, 0);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	/* Create the VAO/VBO. */
+	glGenVertexArrays (1, &hr->framebuffer.vao);
+	glBindVertexArray (hr->framebuffer.vao);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glGenBuffers (1, &hr->framebuffer.vbo);
+	glBindBuffer (GL_ARRAY_BUFFER, hr->framebuffer.vbo);
 	glBufferData (GL_ARRAY_BUFFER,
-	              sizeof (layer_vbo_data), layer_vbo_data, GL_STATIC_DRAW);
+	              sizeof (fb_vbo_data), fb_vbo_data, GL_STATIC_DRAW);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glVertexAttribPointer (0, 3, GL_FLOAT, GL_FALSE,
-	                       sizeof (layer_vbo_data[0]),
+	                       sizeof (fb_vbo_data[0]),
 	                       OFFSET (position));
 	glVertexAttribPointer (1, 2, GL_FLOAT, GL_FALSE,
-	                       sizeof (layer_vbo_data[0]),
+	                       sizeof (fb_vbo_data[0]),
 	                       OFFSET (texcoords));
 	VK_ASSERT_NO_GL_ERROR ();
 
@@ -1675,44 +1743,31 @@ build_2d_state (hikaru_renderer_t *hr)
 #undef OFFSET
 
 static void
-destroy_2d_state (hikaru_renderer_t *hr)
+destroy_fb_state (hikaru_renderer_t *hr)
 {
-	glBindBuffer (GL_ARRAY_BUFFER, 0);
-	glDeleteBuffers (1, &hr->layers.vbo);
+	glBindFramebuffer (GL_FRAMEBUFFER, 0);
+	glDeleteFramebuffers (NUM_FRAMEBUFFERS, hr->framebuffer.fb);
+	glDeleteTextures (NUM_FRAMEBUFFERS, hr->framebuffer.cb);
+	glDeleteRenderbuffers (NUM_FRAMEBUFFERS, hr->framebuffer.db);
+	VK_ASSERT_NO_GL_ERROR ();
 
-	glBindVertexArray (0);
-	glDeleteVertexArrays (1, &hr->layers.vao);
-
-	vk_renderer_destroy_program (hr->layers.program);
+	vk_renderer_destroy_program (hr->framebuffer.program);
 }
 
 static void
-draw_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer)
+upload_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer, GLuint *id, float *mult)
 {
-	mtx4x4f_t projection;
-	float mult;
 	void *data;
-	GLuint id;
 
-	LOG ("drawing LAYER %s", get_layer_str (layer));
+	LOG ("uploading LAYER %s", get_layer_str (layer));
 
-	vk_renderer_ortho (projection, 0.0f, 1.0f, 1.0f, 0.0f, -1.0f, 1.0f);
-
-	/* Setup the GLSL program. */
-	glUseProgram (hr->layers.program);
-	glUniformMatrix4fv (hr->layers.locs.u_projection, 1, GL_FALSE,
-	                    (const GLfloat *) projection);
-	glUniform1i (hr->layers.locs.u_texture, 0);
-
+	data = vk_buffer_get_ptr (hr->gpu->fb,
+	                          layer->y0 * 4096 + layer->x0 * 4);
 
 	/* Upload the layer data to a new texture. */
-	glGenTextures (1, &id);
-	VK_ASSERT_NO_GL_ERROR ();
-
+	glGenTextures (1, id);
 	glActiveTexture (GL_TEXTURE0 + 0);
-	VK_ASSERT_NO_GL_ERROR ();
-
-	glBindTexture (GL_TEXTURE_2D, id);
+	glBindTexture (GL_TEXTURE_2D, *id);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
@@ -1723,9 +1778,6 @@ draw_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer)
 	VK_ASSERT_NO_GL_ERROR ();
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0);
 	VK_ASSERT_NO_GL_ERROR ();
-
-	data = vk_buffer_get_ptr (hr->gpu->fb,
-	                          layer->y0 * 4096 + layer->x0 * 4);
 
 	glPixelStorei (GL_UNPACK_ALIGNMENT, 1);
 	switch (layer->format) {
@@ -1738,7 +1790,7 @@ draw_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer)
 		              GL_RGBA, GL_UNSIGNED_SHORT_1_5_5_5_REV,
 		              data);
 
-		mult = 1.0f;
+		*mult = 1.0f;
 		break;
 	case HIKARU_FORMAT_A2BGR10:
 		glPixelStorei (GL_UNPACK_ROW_LENGTH, 1024);
@@ -1749,18 +1801,101 @@ draw_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer)
 		              GL_RGBA, GL_UNSIGNED_INT_2_10_10_10_REV,
 		              data);
 
-		mult = 4.0f;
+		*mult = 4.0f;
 		break;
 	default:
 		VK_ASSERT (0);
 	}
 	glPixelStorei (GL_UNPACK_ROW_LENGTH, 0);
 	VK_ASSERT_NO_GL_ERROR ();
+}
 
-	glUniform1f (hr->layers.locs.u_texture_multiplier, mult);
+/* TODO make use of the framebuffer configuration in the GPU:1A registers,
+ * right now it only uses the information in the 781/181 commands. */
+static void
+draw (hikaru_renderer_t *hr)
+{
+	hikaru_gpu_t *gpu = hr->gpu;
+	GLuint n1, n2, f, b, layer1 = 0, layer2 = 0;
+	float factor, mult1 = 0.0f, mult2 = 0.0f;
 
-	/* Draw. */
-	glBindVertexArray (hr->layers.vao);
+	/* Figure out the GPU framebuffer assignments */
+	VK_PRINT ("FRAMEBUFFER 781=%08X 181=%08X", gpu->fb_config._781, gpu->fb_config._181);
+
+	n1 = gpu->fb_config.num_1;
+	f = (n1 < 2) ? hr->framebuffer.cb[n1] : (n1 == 2) ? layer1 : layer2;
+
+	n2 = gpu->fb_config.num_2;
+	b = (n2 < 2) ? hr->framebuffer.cb[n2] : (n2 == 2) ? layer1 : layer2;
+
+	factor = 0.0f;
+	if (gpu->fb_config.blend)
+		factor = gpu->fb_config.alpha * (1.0f / 255);
+
+
+	/* We only care about unit 0 for now. (Unit 1 is probably only used
+	 * for the dual-monitor case.) */
+	if ((LAYERS.layer[0][0].enabled || n1 == 2 || n2 == 2) &&
+	    !hr->debug.flags[HR_DEBUG_NO_LAYER1])
+		upload_layer (hr, &LAYERS.layer[0][0], &layer1, &mult1);
+
+	if ((LAYERS.layer[0][1].enabled || n1 == 3 || n2 == 3) &&
+	    !hr->debug.flags[HR_DEBUG_NO_LAYER2])
+		upload_layer (hr, &LAYERS.layer[0][1], &layer2, &mult2);
+
+
+	/* Draw the 3D scene on the front buffer. */
+	glBindFramebuffer (GL_FRAMEBUFFER, f);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	draw_scene (hr);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glBindFramebuffer (GL_FRAMEBUFFER, 0);
+	VK_ASSERT_NO_GL_ERROR ();
+
+
+	/* Setup the GL state for 2D drawing. */
+	glDisable (GL_DEPTH_TEST);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glDisable (GL_BLEND);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glDisable (GL_POLYGON_OFFSET_FILL);
+
+
+	/* Composite all the buffers (front, back, layers). */
+	glUseProgram (hr->framebuffer.program);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	/* Figure out the GPU framebuffer assignments. */
+	glActiveTexture (GL_TEXTURE0 + 0);
+	glBindTexture (GL_TEXTURE_2D, f);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glActiveTexture (GL_TEXTURE0 + 1);
+	glBindTexture (GL_TEXTURE_2D, b);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glActiveTexture (GL_TEXTURE0 + 2);
+	glBindTexture (GL_TEXTURE_2D, (b != layer1) ? layer1 : 0);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glActiveTexture (GL_TEXTURE0 + 3);
+	glBindTexture (GL_TEXTURE_2D, (b != layer2) ? layer2 : 0);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glUniform1i (hr->framebuffer.locs.u_front, 0);
+	glUniform1i (hr->framebuffer.locs.u_back, 1);
+	glUniform1i (hr->framebuffer.locs.u_layer1, 2);
+	glUniform1i (hr->framebuffer.locs.u_layer2, 3);
+	glUniform1f (hr->framebuffer.locs.u_factor, factor);
+	glUniform1f (hr->framebuffer.locs.u_mult1, mult1);
+	glUniform1f (hr->framebuffer.locs.u_mult2, mult2);
+	VK_ASSERT_NO_GL_ERROR ();
+
+	glBindVertexArray (hr->framebuffer.vao);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glDrawArrays (GL_TRIANGLE_STRIP, 0, 4);
@@ -1770,39 +1905,13 @@ draw_layer (hikaru_renderer_t *hr, hikaru_layer_t *layer)
 	glUseProgram (0);
 	VK_ASSERT_NO_GL_ERROR ();
 
+
 	/* Get rid of the layer texture. */
-	glDeleteTextures (1, &id);
+	if (layer1)
+		glDeleteTextures (1, &layer1);
+	if (layer2)
+		glDeleteTextures (1, &layer2);
 	VK_ASSERT_NO_GL_ERROR ();
-}
-
-static void
-draw_layers (hikaru_renderer_t *hr)
-{
-	hikaru_gpu_t *gpu = hr->gpu;
-	hikaru_layer_t *layer;
-
-	if (!LAYERS.enabled)
-		return;
-
-	glDisable (GL_DEPTH_TEST);
-	VK_ASSERT_NO_GL_ERROR ();
-
-	glEnable (GL_BLEND);
-	VK_ASSERT_NO_GL_ERROR ();
-
-	glBlendFunc (GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-
-	glDisable (GL_POLYGON_OFFSET_FILL);
-
-	/* Only draw unit 0 for now. I think unit 1 is there only for
-	 * multi-monitor, which case we don't care about. */
-	layer = &LAYERS.layer[0][1];
-	if (layer->enabled && !hr->debug.flags[HR_DEBUG_NO_LAYER2])
-		draw_layer (hr, layer);
-
-	layer = &LAYERS.layer[0][0];
-	if (layer->enabled && !hr->debug.flags[HR_DEBUG_NO_LAYER2])
-		draw_layer (hr, layer);
 }
 
 /****************************************************************************
@@ -1841,10 +1950,7 @@ hikaru_renderer_end_frame (vk_renderer_t *renderer)
 
 	VK_ASSERT_NO_GL_ERROR ();
 
-	draw_scene (hr);
-	VK_ASSERT_NO_GL_ERROR ();
-
-	draw_layers (hr);
+	draw (hr);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	LOG (" ==== RENDSTATE STATISTICS ==== ");
@@ -1868,7 +1974,7 @@ hikaru_renderer_destroy (vk_renderer_t **renderer_)
 		hikaru_renderer_t *hr = (hikaru_renderer_t *) *renderer_;
 
 		destroy_3d_state (hr);
-		destroy_2d_state (hr);
+		destroy_fb_state (hr);
 
 		hikaru_renderer_invalidate_texcache (*renderer_, NULL);
 	}
@@ -1907,7 +2013,7 @@ hikaru_renderer_new (vk_buffer_t *fb, vk_buffer_t *texram[2])
 		goto fail;
 	VK_ASSERT_NO_GL_ERROR ();
 
-	if (build_2d_state (hr))
+	if (build_fb_state (hr))
 		goto fail;
 	VK_ASSERT_NO_GL_ERROR ();
 

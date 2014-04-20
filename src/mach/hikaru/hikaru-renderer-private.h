@@ -154,13 +154,19 @@ typedef struct {
 	} textures;
 
 	struct {
-		GLuint program, vao, vbo;
+		GLuint program;
+		GLuint fb[2], cb[2], db[2];
+		GLuint vao, vbo;
 		struct {
-			GLuint u_projection;
-			GLuint u_texture;
-			GLuint u_texture_multiplier;
+			GLuint u_front;
+			GLuint u_back;
+			GLuint u_layer1;
+			GLuint u_layer2;
+			GLuint u_factor;
+			GLuint u_mult1;
+			GLuint u_mult2;
 		} locs;
-	} layers;
+	} framebuffer;
 
 	struct {
 		int32_t flags[HR_NUM_DEBUG_VARS];
