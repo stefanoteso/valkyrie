@@ -431,7 +431,7 @@ void main (void) {								\n \
 	p_position = u_modelview * vec4 (i_position, 1.0);			\n \
 	gl_Position = u_projection * p_position;				\n \
 										\n \
-	p_normal = normalize (u_normal * i_normal);				\n \
+	p_normal = u_normal * i_normal;						\n \
 										\n \
 	p_diffuse = i_diffuse;							\n \
 	p_ambient = i_ambient;							\n \
@@ -498,8 +498,10 @@ apply_light (inout vec3 diffuse,						\n \
 	attenuation = light.extents.x * (light.extents.y + distance);		\n \
 	attenuation = clamp (attenuation, 0.0, 1.0);				\n \
 										\n \
-//	intensity = max (dot (p_normal, light_direction), 0.0);			\n \
-	intensity = abs (dot (p_normal, light_direction));			\n \
+	vec3 normal = normalize (p_normal);					\n \
+										\n \
+//	intensity = max (dot (normal, light_direction), 0.0);			\n \
+	intensity = abs (dot (normal, light_direction));			\n \
 	if (type == 2) {							\n \
 		vec3 spot_direction = normalize (light.direction);		\n \
 		if (dot (spot_direction, light_direction) < 0.95)		\n \
@@ -510,7 +512,7 @@ apply_light (inout vec3 diffuse,						\n \
 										\n \
 	if (has_specular != 0) {								\n \
 		vec3 view_direction = normalize (-p_position.xyz);				\n \
-		vec3 reflect_direction = normalize (-reflect (light_direction, p_normal));	\n \
+		vec3 reflect_direction = normalize (-reflect (light_direction, normal));	\n \
 		float angle = max (dot (view_direction, reflect_direction), 0.0);		\n \
 		specular += p_specular.rgb * light.specular * pow (angle, p_specular.a);	\n \
 	}											\n \
