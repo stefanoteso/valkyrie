@@ -431,8 +431,7 @@ void main (void) {								\n \
 	p_position = u_modelview * vec4 (i_position, 1.0);			\n \
 	gl_Position = u_projection * p_position;				\n \
 										\n \
-	mat3 normal_matrix = mat3 (transpose (inverse (u_modelview)));		\n \
-	p_normal = normalize (normal_matrix * i_normal);			\n \
+	p_normal = normalize (u_normal * i_normal);				\n \
 										\n \
 	p_diffuse = i_diffuse;							\n \
 	p_ambient = i_ambient;							\n \
