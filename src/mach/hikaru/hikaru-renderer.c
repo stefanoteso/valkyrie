@@ -208,12 +208,12 @@ upload_texture (hikaru_renderer_t *hr, hikaru_texhead_t *th)
 	glBindTexture (GL_TEXTURE_2D, id);
 	VK_ASSERT_NO_GL_ERROR ();
 
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S,
-	                 (th->wrapu == 0) ? GL_CLAMP_TO_EDGE :
-	                 (th->repeatu == 0) ? GL_REPEAT : GL_MIRRORED_REPEAT);
-	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T,
-	                 (th->wrapv == 0) ? GL_CLAMP_TO_EDGE :
-	                 (th->repeatv == 0) ? GL_REPEAT : GL_MIRRORED_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_MIRRORED_REPEAT);
+//	                 (th->wrapu == 0) ? GL_CLAMP_TO_EDGE :
+//	                 (th->repeatu == 0) ? GL_REPEAT : GL_MIRRORED_REPEAT);
+	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_MIRRORED_REPEAT);
+//	                 (th->wrapv == 0) ? GL_CLAMP_TO_EDGE :
+//	                 (th->repeatv == 0) ? GL_REPEAT : GL_MIRRORED_REPEAT);
 	VK_ASSERT_NO_GL_ERROR ();
 
 	glTexParameteri (GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
