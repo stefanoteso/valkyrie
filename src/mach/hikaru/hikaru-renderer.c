@@ -512,9 +512,9 @@ apply_light (inout vec3 diffuse,						\n \
 										\n \
 	if (has_specular != 0) {								\n \
 		vec3 view_direction = normalize (-p_position.xyz);				\n \
-		vec3 reflect_direction = normalize (-reflect (light_direction, normal));	\n \
+		vec3 reflect_direction = reflect (-light_direction, normal);			\n \
 		float angle = max (dot (view_direction, reflect_direction), 0.0);		\n \
-		specular += p_specular.rgb * light.specular * pow (angle, p_specular.a);	\n \
+		specular += p_specular.rgb * light.specular * pow (angle, 255.0 * p_specular.a);	\n \
 	}											\n \
 }										\n \
 										\n \
