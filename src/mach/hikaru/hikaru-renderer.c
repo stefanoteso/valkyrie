@@ -557,7 +557,7 @@ main (void)									\n \
 										\n \
 #if HAS_FOG									\n \
 	float z = gl_FragCoord.z / gl_FragCoord.w;				\n \
-	float a = clamp (u_fog[0] * (z - u_fog[1]), 0.0, 1.0);			\n \
+	float a = clamp (u_fog.x * (z - u_fog.y), 0.0, 1.0);			\n \
 	gl_FragColor = mix (color, vec4 (u_fog_color, 1.0), a);			\n \
 #else										\n \
 	gl_FragColor = color;							\n \
@@ -593,7 +593,6 @@ get_light_type (hikaru_light_t *lit)
 static hikaru_glsl_variant_t
 get_glsl_variant (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 {
-	hikaru_viewport_t *vp   = &hr->vp_list[mesh->vp_index];
 	hikaru_material_t *mat	= &hr->mat_list[mesh->mat_index];
 	hikaru_lightset_t *ls	= &hr->ls_list[mesh->ls_index];
 	hikaru_glsl_variant_t variant;
@@ -622,8 +621,7 @@ get_glsl_variant (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 	                          mat->shading_mode != 0 &&
 	                          !hr->debug.flags[HR_DEBUG_NO_LIGHTING];
 
-	variant.has_fog		= !vp->depth.q_enabled &&
-				  mat->depth_blend == 0 &&
+	variant.has_fog		= mat->depth_blend == 0 &&
 	                          hr->debug.flags[HR_DEBUG_FOG];
 
 	if (!variant.has_lighting)
