@@ -500,8 +500,11 @@ apply_light (inout vec3 diffuse,						\n \
 										\n \
 	vec3 normal = normalize (p_normal);					\n \
 										\n \
-//	intensity = max (dot (normal, light_direction), 0.0);			\n \
+#if HAS_TWO_SIDED_LIGHTING							\n \
 	intensity = abs (dot (normal, light_direction));			\n \
+#else										\n \
+	intensity = max (dot (normal, light_direction), 0.0);			\n \
+#endif										\n \
 	if (type == 2) {							\n \
 		vec3 spot_direction = normalize (light.direction);		\n \
 		if (dot (spot_direction, light_direction) < 0.95)		\n \
@@ -648,6 +651,9 @@ get_glsl_variant (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 	variant.light3_att_type		= get_light_attenuation_type (&ls->lights[3]);
 	variant.has_light3_specular	= ls->lights[3].has_specular;
 
+	if (mesh->has_two_sided_lighting)
+		variant.has_two_sided_lighting = 1;
+
 	return variant;
 }
 
@@ -665,6 +671,7 @@ upload_glsl_program (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 	static const char *definitions_template =
 	"#define HAS_TEXTURE %d\n"
 	"#define HAS_LIGHTING %d\n"
+	"#define HAS_TWO_SIDED_LIGHTING %d\n"
 	"#define HAS_PHONG %d\n"
 	"#define HAS_LIGHT0 %d\n"
 	"#define LIGHT0_TYPE %d\n"
@@ -701,11 +708,12 @@ upload_glsl_program (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 		}
 	}
 
-	VK_LOG ("compiling shader for variant %X", variant.full);
+	VK_LOG ("compiling shader for variant %lX", variant.full);
 
 	ret = asprintf (&definitions, definitions_template,
 	                variant.has_texture,
 	                variant.has_lighting,
+	                variant.has_two_sided_lighting,
 	                variant.has_phong,
 	                variant.has_light0,
 	                variant.light0_type,
@@ -1086,6 +1094,9 @@ add_triangle (hikaru_renderer_t *hr)
 		    !hr->push.tmp[2].info.nocull)
 			VK_ERROR ("got a vertex with culling and two-sided lighting!");
 
+		if (hr->push.tmp[2].info.twosided)
+			hr->meshes.current->has_two_sided_lighting = 1;
+
 		if (hr->push.tmp[2].info.nocull) {
 			dst[0] = hr->push.tmp[0].body;
 			dst[1] = hr->push.tmp[2].body;
@@ -1218,6 +1229,8 @@ update_and_set_rendstate (hikaru_renderer_t *hr, hikaru_mesh_t *mesh)
 {
 	hikaru_gpu_t *gpu = hr->gpu;
 	unsigned i;
+
+	memset ((void *) mesh, 0, sizeof (hikaru_mesh_t));
 
 	LOG ("RENDSTATE updating vp %u/%u", hr->num_vps, MAX_VIEWPORTS);
 	hr->vp_list[hr->num_vps++] = VP0;

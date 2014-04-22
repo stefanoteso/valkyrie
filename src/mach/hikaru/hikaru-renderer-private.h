@@ -43,33 +43,34 @@ enum {
 
 typedef union {
 	struct {
-		uint32_t has_texture		: 1;
-		uint32_t has_lighting		: 1;
-		uint32_t has_phong		: 1;
+		uint64_t has_texture		: 1;
+		uint64_t has_lighting		: 1;
+		uint64_t has_two_sided_lighting	: 1;
+		uint64_t has_phong		: 1;
 
-		uint32_t has_light0		: 1;
-		uint32_t light0_type		: 2;
-		uint32_t light0_att_type	: 3;
-		uint32_t has_light0_specular	: 1;
+		uint64_t has_light0		: 1;
+		uint64_t light0_type		: 2;
+		uint64_t light0_att_type	: 3;
+		uint64_t has_light0_specular	: 1;
 
-		uint32_t has_light1		: 1;
-		uint32_t light1_type		: 2;
-		uint32_t light1_att_type	: 3;
-		uint32_t has_light1_specular	: 1;
+		uint64_t has_light1		: 1;
+		uint64_t light1_type		: 2;
+		uint64_t light1_att_type	: 3;
+		uint64_t has_light1_specular	: 1;
 
-		uint32_t has_light2		: 1;
-		uint32_t light2_type		: 2;
-		uint32_t light2_att_type	: 3;
-		uint32_t has_light2_specular	: 1;
+		uint64_t has_light2		: 1;
+		uint64_t light2_type		: 2;
+		uint64_t light2_att_type	: 3;
+		uint64_t has_light2_specular	: 1;
 
-		uint32_t has_light3		: 1;
-		uint32_t light3_type		: 2;
-		uint32_t light3_att_type	: 3;
-		uint32_t has_light3_specular	: 1;
+		uint64_t has_light3		: 1;
+		uint64_t light3_type		: 2;
+		uint64_t light3_att_type	: 3;
+		uint64_t has_light3_specular	: 1;
 
-		uint32_t has_fog		: 1;
+		uint64_t has_fog		: 1;
 	};
-	uint32_t full;
+	uint64_t full;
 } hikaru_glsl_variant_t;
 
 typedef struct {
@@ -89,6 +90,7 @@ typedef struct {
 	uint32_t		ls_index;
 	float			alpha_thresh[2];
 	float			depth_bias;
+	bool			has_two_sided_lighting;
 	uint32_t		num;
 } hikaru_mesh_t;
 
