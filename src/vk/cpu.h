@@ -24,10 +24,10 @@
 #include "vk/machine.h"
 
 typedef enum {
+	VK_CPU_STATE_RUN,
 	VK_CPU_STATE_STOP,
 	VK_CPU_STATE_SLEEP,
 	VK_CPU_STATE_STANDBY,
-	VK_CPU_STATE_RUN,
 
 	VK_NUM_CPU_STATES
 } vk_cpu_state_t;

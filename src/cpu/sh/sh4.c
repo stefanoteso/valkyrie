@@ -1222,9 +1222,7 @@ sh4_run (vk_cpu_t *cpu, int cycles)
 	sh4_t *ctx = (sh4_t *) cpu;
 
 	cpu->remaining = cycles;
-	while (cpu->remaining > 0) {
-		if (cpu->state != VK_CPU_STATE_RUN)
-			return 0;
+	while (cpu->remaining > 0 && cpu->state == VK_CPU_STATE_RUN) {
 		sh4_process_irqs (cpu);
 		sh4_step (ctx, PC);
 		PC += 2;
