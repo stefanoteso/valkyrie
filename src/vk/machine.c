@@ -143,7 +143,7 @@ load_save_state (vk_machine_t *mach, const char *path, uint32_t mode)
 
 	state = vk_state_new (path, mode);
 	if (!state) {
-		VK_ERROR ("%s state doneed: cannot create state object", op);
+		VK_ERROR ("%s state: cannot create state object", op);
 		ret = -1;
 		goto done;
 	}
@@ -157,7 +157,7 @@ load_save_state (vk_machine_t *mach, const char *path, uint32_t mode)
 		      vk_buffer_load_state (buf, state) :
 		      vk_buffer_save_state (buf, state);
 		if (ret) {
-			VK_ERROR ("%s state doneed: cannot %s buffer", op, op);
+			VK_ERROR ("%s state: cannot %s buffer", op, op);
 			goto done;
 		}
 	}
@@ -168,7 +168,7 @@ load_save_state (vk_machine_t *mach, const char *path, uint32_t mode)
 		      vk_device_load_state (dev, state) :
 		      vk_device_save_state (dev, state);
 		if (ret) {
-			VK_ERROR ("%s state doneed: cannot %s device", op, op);
+			VK_ERROR ("%s state: cannot %s device", op, op);
 			goto done;
 		}
 	}
@@ -176,14 +176,14 @@ load_save_state (vk_machine_t *mach, const char *path, uint32_t mode)
 	ret = (mode == VK_STATE_LOAD) ? mach->load_state (mach, state) :
 	                                mach->save_state (mach, state);
 	if (ret) {
-		VK_ERROR ("%s state doneed; cannot %s machine", op, op);
+		VK_ERROR ("%s state; cannot %s machine", op, op);
 		goto done;
 	}
 
 done:
 	vk_state_destroy (&state, ret);
 	if (ret && mode == VK_STATE_LOAD) {
-		VK_ERROR ("load state doneed: resetting machine");
+		VK_ERROR ("load state: resetting machine");
 		vk_machine_reset (mach, VK_RESET_TYPE_HARD);
 	}
 	return ret;
