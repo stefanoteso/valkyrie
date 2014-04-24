@@ -10,8 +10,6 @@ written entirely by reverse engineering the little Hikaru software available.
 As of now, this Hikaru emulator is unstable, incomplete, primitive, slow,
 crude, and sometimes hacky.
 
-DON NOT EXPECT GAMES TO RUN AT ALL.
-
 Until the time comes, Valkyrie should be considered a ``technological
 preview'', and is really targeted towards developers rather than users.
 If you are not interested in developing valkyrie, please consider waiting
@@ -24,16 +22,13 @@ CURRENT STATUS AND FUTURE DEVELOPMENTS
 ======================================
 
 At the present moment, valkyrie is able to run all known Hikaru BOOTROMs
-(versionsi 0.84, 0.92, 0.96) and the existing complete ROM dumps typically
-up to attract mode. While still largely incomplete, 3D emulation is there.
-Please see the CONTRIBUTING file for hints as to where the biggest emulation
-issues are.
+(versionsi 0.84, 0.92, 0.96) and the existing complete ROM dumps typically up
+to attract mode. 3D emulation is almost complete, modulo bugs.  Please see the
+CONTRIBUTING file for hints as to where the biggest emulation issues are.
 
-Concerning future developments, I can only say that I personally have very
-little time to dedicate to Valkyrie. That said, you are free to clone this
-repository and do your own work on your branch, provided that you respect the
-license. If you do work on valkyrie, please contact me so we can possibly
-coordinate our efforts.
+You are free to clone this repository and do your own work on your branch,
+provided that you respect the license. If you do work on valkyrie, please
+contact me so we can possibly coordinate our efforts.
 
 You are free to make use the information contained in this source for your
 own project. If you make use of this work in any way, you may want to give
