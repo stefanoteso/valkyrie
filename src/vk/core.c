@@ -20,33 +20,6 @@
 #include "vk/core.h"
 
 bool
-is_valid_mat4x3f (mtx4x3f_t m)
-{
-	unsigned i, j;
-	float norm = 0.0f;
-	/* Compute the Froboenius norm */
-	for (i = 0; i < 4; i++)
-		for (j = 0; j < 3; j++)
-			norm += m[i][j] * m[i][j];
-	norm = sqrtf (norm);
-	return (norm > 0.0) && isfinite (norm);
-}
-
-bool
-is_valid_mat4x4f (mtx4x4f_t m)
-{
-	unsigned i, j;
-	float norm = 0.0f;
-	/* Compute the Froboenius norm */
-	for (i = 0; i < 4; i++)
-		for (j = 0; j < 3; j++)
-			norm += m[i][j] * m[i][j];
-	norm = sqrtf (norm);
-	return (norm > 0.0) && isfinite (norm);
-}
-
-
-bool
 vk_util_get_bool_option (const char *name, bool fallback)
 {
 	char *env = getenv (name);

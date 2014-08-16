@@ -305,11 +305,6 @@ signext_n_64 (const uint64_t in, const unsigned sign_bit)
 	} while (0)
 #endif
 
-/* XXX the following is a big mess; clean it up please */
-
-bool	is_valid_mat4x3f (mtx4x3f_t mtx);
-bool	is_valid_mat4x4f (mtx4x4f_t mtx);
-
 bool	vk_util_get_bool_option (const char *name, bool fallback);
 int	vk_util_get_int_option (const char *name, int fallback);
 
