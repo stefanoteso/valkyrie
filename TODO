@@ -45,8 +45,6 @@ using the ones provided by the games as they are leads to a far too close
 far clipping plane. Use 'p' to toggle a standard 90 degree FOV projection and
 see things (affects all games).
 
-Implement viewports properly, urgently.
-
 Fix alpha ordering, urgently.
 
 Fix instanced rendering; there is no linking system, just odd matrices.
@@ -63,10 +61,6 @@ Fix fogging.
 Implement alpha testing (used in BRAVEFF, instruction 154).
 
 Implement proper model caching using VBOs.
-
-Compute the normal matrix in upload_modelvew().
-
-Make use of explicit uniform locations, where available.
 
 Fix texture wrap/repeat (BRAVEFF, AIRTRIX do not work properly yet.)
 
@@ -107,11 +101,6 @@ PHARRIER
 
 Attract mode works.
 
-3D hiccups, don't know yet why (strategy: monitor writes to CMDRAM, TMU, IRQs,
-and reads from GPU ports -- the reason lies there).
-
-The 2D is in ABGR8888 format, but it doesn't always work.
-
 References:
  http://www.youtube.com/watch?v=_kED3wt6p90
  http://www.youtube.com/watch?v=VCVnNBkeRX8
@@ -120,7 +109,7 @@ References:
 PODRACE
 -------
 
-Missing MASKROMS. Won't work.
+Not fully dumped yet.
 
 
 SGNASCAR
