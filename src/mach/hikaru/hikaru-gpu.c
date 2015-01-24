@@ -427,19 +427,19 @@
  * Bits in 15000088:
  *
  *  01, bit 0 = GPU 15 indirect DMA done
- *  02, bit 1 = Unknown but required for the bootrom to work
- *  04, bit 2 = GPU 15 done / ready
+ *  02, bit 1 = GPU 15 polygon-out done
+ *  04, bit 2 = GPU 15 command analysis done
  *  08, bit 3 = Unknown
  *  10, bit 4 = Unknown
  *  20, bit 5 = Unknown
  *  40, bit 6 = Unknown
- *  80, bit 7 = 1A0000xx IRQ mirror
+ *  80, bit 7 = GPU 1A
  *
  * Bits in 1A000088:
  *
  *  01, bit 0 = Unknown
- *  02, bit 1 = Vblank-out or Hblank-out [1]
- *  04, bit 2 = GPU 1A done / ready
+ *  02, bit 1 = Vblank[1]
+ *  04, bit 2 = GPU 1A plot done
  *  08, bit 4 = Unknown
  *
  * IRQs at 1A000018 are most likely related to Texture/FB operations, that is,
